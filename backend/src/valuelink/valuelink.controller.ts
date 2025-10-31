@@ -1,11 +1,13 @@
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, UseGuards, Req } from '@nestjs/common';
 import { ValueLinkService } from './valuelink.service';
 import { IsInt, IsOptional, Min, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
+import { JwtAuthGuard } from '../auth/jwt.guard';
 
 class CreateValueLinkDto {
+  @IsOptional()
   @IsString()
-  fromUserId!: string;
+  fromUserId?: string;
 
   @IsString()
   toUserId!: string;
@@ -25,9 +27,11 @@ class CreateValueLinkDto {
 export class ValueLinkController {
   constructor(private service: ValueLinkService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post()
-  async create(@Body() dto: CreateValueLinkDto) {
-    return this.service.create(dto);
+  async create(@Body() dto: CreateValueLinkDto, @Req() req: any) {
+    const data = { ...dto, fromUserId: dto.fromUserId ?? req.user?.sub };
+    return this.service.create(data as any);
   }
 
   @Get(':userId')

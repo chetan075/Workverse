@@ -1,6 +1,7 @@
-import { Controller, Get, Param, Patch, Body } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Body, UseGuards, Req, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { IsOptional, IsString } from 'class-validator';
+import { JwtAuthGuard } from '../auth/jwt.guard';
 
 class UpdateUserDto {
   @IsOptional()
@@ -17,14 +18,17 @@ export class UsersController {
     return this.users.findById(id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  patch(@Param('id') id: string, @Body() body: UpdateUserDto) {
-    return (this.users.update(id,body));
+  async patch(@Param('id') id: string, @Body() body: UpdateUserDto, @Req() req: any) {
+    // simple authorization: only allow users to update their own profile
+    if (req.user?.sub !== id) throw new UnauthorizedException('Cannot modify other user');
+    return this.users.update(id, body as any);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('me')
-  async me() {
-    // Stub: in real app, use auth guard to get user id from token
-    return { message: 'Use JWT protected route to get /users/me' };
+  async me(@Req() req: any) {
+    return this.users.me(req.user.sub);
   }
 }

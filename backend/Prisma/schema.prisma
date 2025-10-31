@@ -28,6 +28,8 @@ model Invoice {
   status       InvoiceStatus @default(DRAFT)
   clientId     String?
   freelancerId String?
+  stripePaymentIntentId String?
+  releasedAt   DateTime?
   createdAt    DateTime      @default(now())
 
   // relations
@@ -57,4 +59,5 @@ enum InvoiceStatus {
   DRAFT
   SENT
   PAID
+  RELEASED
 }

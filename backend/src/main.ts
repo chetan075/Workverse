@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe, Logger } from '@nestjs/common';
+import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -16,6 +17,15 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+    }),
+  );
+
+  // Capture raw body for Stripe webhook signature verification
+  app.use(
+    bodyParser.json({
+      verify: (req: any, _res, buf) => {
+        if (buf && buf.length) req.rawBody = buf.toString();
+      },
     }),
   );
 

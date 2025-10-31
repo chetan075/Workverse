@@ -1,7 +1,8 @@
-import { Controller, Post, Body, Get, Param, Patch } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Patch, UseGuards, Req } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { IsString, IsNumber, IsOptional, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { JwtAuthGuard } from '../auth/jwt.guard';
 
 class CreateInvoiceDto {
   @IsString()
@@ -31,9 +32,11 @@ class UpdateInvoiceStatusDto {
 export class InvoicesController {
   constructor(private invoices: InvoicesService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post()
-  async create(@Body() dto: CreateInvoiceDto) {
-    return this.invoices.create(dto as any);
+  async create(@Body() dto: CreateInvoiceDto, @Req() req: any) {
+    const data = { ...dto, clientId: dto.clientId ?? req.user?.sub };
+    return this.invoices.create(data as any);
   }
 
   @Get(':id')
