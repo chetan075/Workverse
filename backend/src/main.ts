@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import * as bodyParser from 'body-parser';
+import * as cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -10,7 +11,20 @@ async function bootstrap() {
   });
 
   // Basic production/dev safe defaults
-  app.enableCors(); // or configure origin list: app.enableCors({ origin: ['https://your.app'] })
+  const front = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+  app.enableCors({
+    origin: (origin, callback) => {
+      // allow requests with no origin (curl, server-to-server)
+      if (!origin) return callback(null, true);
+      // allow your dev origin, or add other dev origins as needed
+      if (origin === front) return callback(null, true);
+      // dev fallback: allow any origin (ONLY for dev)
+      if (process.env.NODE_ENV !== 'production') return callback(null, true);
+      callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  });
+  app.use(cookieParser());
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({

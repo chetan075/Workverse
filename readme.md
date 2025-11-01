@@ -1,3 +1,53 @@
+🩵 PHASE 1 — Core MVP Backend (Functional REST API)
+Goal: Get the backend running with clean REST endpoints, auth, invoices, and database models.
+
+What you’ll have by end:
+
+NestJS backend + PostgreSQL + Prisma working
+REST APIs for Auth, Users, Invoices, and ValueLinks
+Tested via Postman
+Clean, modular code ready for integration
+Modules:
+
+AuthModule (JWT-based)
+UsersModule
+InvoicesModule
+ValueLinkModule
+Outcome: 💡 “A centralized prototype that simulates ChainBill + KeyLink logic, all off-chain.”
+
+💰 PHASE 2 — Payments Integration (Stripe + Escrow Simulation)
+Goal: Connect real fiat flow for proof of value transfer.
+
+What you’ll add:
+
+PaymentsModule — Stripe integration
+Escrow simulation in DB (no blockchain yet)
+Webhooks (/webhooks/stripe) for payment updates
+Basic status flow: DRAFT → PAID → RELEASED
+Outcome: 💳 Users can pay invoices via Stripe → status changes → simulate escrow release.
+
+🔗 PHASE 3 — Blockchain Layer (Aptos / Move contracts)
+Goal: Add true decentralized elements.
+
+What you’ll add:
+
+BlockchainModule (Aptos SDK)
+Move contract for Escrow (Escrow.move)
+Invoice NFT minting
+Reputation SBT (SoulBound Token)
+Wallet authentication via Aptos signature
+Outcome: 🔐 You’ll be able to see invoices minted as NFTs and payments represented as on-chain transactions.
+
+🧠 PHASE 4 — AI Integration (Validation + Summaries)
+Goal: Add AI-powered intelligence for invoices.
+
+What you’ll add:
+
+AIModule (OpenAI / LangChain integration)
+Invoice text parser
+AI validation endpoint /invoices/:id/validate
+AI anomaly detector & summary generator
+Outcome: 🤖 “AI validates your invoice and suggests due dates or flags inconsistencies.”
 🧠 PHASE 4 — AI Integration (Validation + Summaries)
 Goal: Add AI-powered intelligence for invoices.
 

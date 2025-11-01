@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Param, UseGuards, Req, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { BlockchainService } from './blockchain.service';
 import { JwtAuthGuard } from 'src/auth/jwt.guard';
 
@@ -24,8 +33,13 @@ export class BlockchainController {
 
   @Post('auth/verify')
   verify(@Body() dto: VerifyDto) {
-    if (!dto.publicKey) throw new BadRequestException('publicKey is required for verification');
-    const res = this.service.verifySignature(dto.address, dto.signature, dto.publicKey);
+    if (!dto.publicKey)
+      throw new BadRequestException('publicKey is required for verification');
+    const res = this.service.verifySignature(
+      dto.address,
+      dto.signature,
+      dto.publicKey,
+    );
     if (!res) throw new UnauthorizedException('signature verification failed');
     return res;
   }
@@ -41,5 +55,12 @@ export class BlockchainController {
   @Post('mint-sbt/:userId')
   async mintSBT(@Param('userId') userId: string) {
     return this.service.mintReputationSBT(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('publish')
+  async publishModule() {
+    // requires APTOS_PRIVATE_KEY to be set in the environment of the server
+    return this.service.publishEscrowModule();
   }
 }

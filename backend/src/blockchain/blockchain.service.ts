@@ -5,6 +5,11 @@ import { randomBytes } from 'crypto';
 import nacl from 'tweetnacl';
 import { TextEncoder } from 'util';
 import { AptosClient, AptosAccount } from 'aptos';
+import { promisify } from 'util';
+import { exec as execCb } from 'child_process';
+import path from 'path';
+import fs from 'fs/promises';
+const exec = promisify(execCb);
 
 interface ChallengeEntry {
   challenge: string;
@@ -95,6 +100,8 @@ export class BlockchainService {
       return { invoiceId, txHash: fakeTx, stub: true };
     }
 
+    let tokenId: number | undefined;
+
     try {
       const client = new AptosClient(nodeUrl);
       // AptosAccount.fromPrivateKeyHex exists in current SDKs; if not, this will throw and be caught
@@ -102,26 +109,64 @@ export class BlockchainService {
       const account = new AptosAccount(Buffer.from(pkHex, 'hex'));
       const deployer = account.address().hex();
 
-      // Build a simple entry function payload calling Escrow::mint_invoice(u64)
+      // Build metadata JSON from invoice and encode to bytes
+      const metadata = {
+        invoiceId: inv.id,
+        title: inv.title,
+        amount: inv.amount,
+        clientId: inv.clientId,
+        freelancerId: inv.freelancerId,
+        mintedAt: new Date().toISOString(),
+      };
+      const metadataJson = JSON.stringify(metadata);
+      const metadataBytes = Array.from(Buffer.from(metadataJson, 'utf8'));
+
+    // Deterministic tokenId: take first 6 bytes of sha256(invoice.uuid) -> safe u64 within JS number range
+    const crypto = await import('crypto');
+    const hash = crypto.createHash('sha256').update(inv.id).digest();
+      // use first 6 bytes -> 48 bits -> safe integer
+      tokenId =
+        hash[0] * 2 ** 40 +
+        hash[1] * 2 ** 32 +
+        hash[2] * 2 ** 24 +
+        hash[3] * 2 ** 16 +
+        hash[4] * 2 ** 8 +
+        hash[5] * 1;
+
+      // Call the new Move entry function mint_invoice_with_metadata(account, invoice_id, metadata: vector<u8>)
       const payload: any = {
-        function: `${deployer}::Escrow::mint_invoice`,
+        function: `${deployer}::Escrow::mint_invoice_with_metadata`,
         type_arguments: [],
-        arguments: [Number(invoiceId)],
+        arguments: [Number(tokenId), metadataBytes],
       };
 
       // Generate, sign and submit transaction using SDK helpers where available
-      const txRequest = await client.generateTransaction(
-        account.address(),
-        payload as any,
-      );
+      const txRequest = await client.generateTransaction(account.address(), payload as any);
       // sign & submit
       const signed = await client.signTransaction(account, txRequest as any);
       // submitSignedTransaction is not present in this SDK version; use submitSignedBCSTransaction
       const res = await client.submitSignedBCSTransaction(signed);
-      return { invoiceId, txHash: res.hash };
+      // Persist tokenId and txHash into Invoice record
+      try {
+        // prisma client may be out-of-date until `npx prisma generate` is run; cast data as any to avoid TS type errors in dev
+        await this.prisma.invoice.update({
+          where: { id: invoiceId },
+          data: ({ tokenId: BigInt(tokenId!), onchainTxHash: String(res.hash) } as any),
+        });
+      } catch (e) {
+        // ignore persistence error but return tx info
+      }
+      return { invoiceId, tokenId, txHash: res.hash };
     } catch (e) {
       const fakeTx = '0x' + randomBytes(12).toString('hex');
-      return { invoiceId, txHash: fakeTx, error: String(e) };
+      const fallbackTokenId = tokenId ?? Date.now();
+      try {
+        await this.prisma.invoice.update({
+          where: { id: invoiceId },
+          data: ({ tokenId: BigInt(fallbackTokenId), onchainTxHash: fakeTx } as any),
+        });
+      } catch (_) {}
+      return { invoiceId, tokenId: fallbackTokenId, txHash: fakeTx, error: String(e) };
     }
   }
 
@@ -159,6 +204,53 @@ export class BlockchainService {
     } catch (e) {
       const fakeTx = '0x' + randomBytes(12).toString('hex');
       return { userId, txHash: fakeTx, error: String(e) };
+    }
+  }
+
+  // Publish the Escrow.move package using the Aptos CLI if available.
+  // This helper will run `aptos move compile` and `aptos move publish` against the
+  // `backend/src/blockchain/contracts` folder. CLI must be installed and configured.
+  async publishEscrowModule() {
+    const projectDir = path.resolve(__dirname, 'contracts');
+    if (!process.env.APTOS_PRIVATE_KEY) {
+      throw new Error('APTOS_PRIVATE_KEY not set in environment; cannot publish module');
+    }
+
+    // Optionally replace deployer placeholder in Move file with APTOS_DEPLOYER_ADDRESS
+    const deployerAddr = process.env.APTOS_DEPLOYER_ADDRESS;
+    const contractPath = path.join(projectDir, 'Escrow.move');
+    let originalContent: string | null = null;
+    try {
+      if (deployerAddr) {
+        originalContent = await fs.readFile(contractPath, 'utf8');
+        const normalized = deployerAddr.startsWith('0x') ? deployerAddr : `0x${deployerAddr}`;
+        const replaced = originalContent.replace(/0x\{\{DEPLOYER\}\}/g, normalized);
+        await fs.writeFile(contractPath, replaced, 'utf8');
+      }
+
+      const compileCmd = `aptos move compile --package-dir "${projectDir}"`;
+      const publishCmd = `aptos move publish --package-dir "${projectDir}" --assume-yes`;
+
+      const compileRes = await exec(compileCmd);
+      const publishRes = await exec(publishCmd);
+
+      // restore original file if we replaced it
+      if (originalContent !== null) {
+        await fs.writeFile(contractPath, originalContent, 'utf8');
+      }
+
+      return {
+        compile: compileRes.stdout || compileRes.stderr,
+        publish: publishRes.stdout || publishRes.stderr,
+      };
+    } catch (e: any) {
+      // restore original if needed
+      if (originalContent !== null) {
+        try {
+          await fs.writeFile(contractPath, originalContent, 'utf8');
+        } catch (_) {}
+      }
+      return { error: String(e), stdout: e?.stdout, stderr: e?.stderr };
     }
   }
 }

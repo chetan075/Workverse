@@ -13,28 +13,65 @@ model User {
   name       String?
   password   String
   role       Role      @default(FREELANCER)
+  
+  // Profile fields
+  bio            String?
+  title          String?  // e.g., "Senior Full-Stack Developer"
+  location       String?
+  website        String?
+  profileImage   String?
+  hourlyRate     Float?
+  currency       String?   @default("USD")
+  yearsExperience Int?
+  
+  // Availability
+  availability   AvailabilityStatus @default(AVAILABLE)
+  hoursPerWeek   Int?               @default(40)
+  timezone       String?
+  
   createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now())
+  
   // relations
   invoicesAsClient     Invoice[] @relation("clientInvoices")
   invoicesAsFreelancer Invoice[] @relation("freelancerInvoices")
   linksFrom            ValueLink[] @relation("linksFrom")
   linksTo              ValueLink[] @relation("linksTo")
+  
+  // disputes & reputation relations
+  openedDisputes       Dispute[]
+  disputeVotes         DisputeVote[]
+  reputation           Reputation?
+  
+  // enhanced relations
+  skills               UserSkill[]
+  projects             Project[]  @relation("ProjectFreelancer")
+  clientProjects       Project[]  @relation("ProjectClient")
+  reviews              Review[]   @relation("ReviewTarget")
+  givenReviews         Review[]   @relation("ReviewAuthor")
 }
 
 model Invoice {
   id           String           @id @default(uuid())
   title        String
   amount       Float
+  dueDate      DateTime?
+  currency     String?
   status       InvoiceStatus @default(DRAFT)
   clientId     String?
   freelancerId String?
   stripePaymentIntentId String?
   releasedAt   DateTime?
+  tokenId      BigInt?
+  onchainTxHash String?
   createdAt    DateTime      @default(now())
 
   // relations
   client     User? @relation("clientInvoices", fields: [clientId], references: [id])
   freelancer User? @relation("freelancerInvoices", fields: [freelancerId], references: [id])
+  storedFiles StoredFile[]
+  disputes    Dispute[]
+  project     Project?      // one-to-one relation with Project
 }
 
 model ValueLink {
@@ -60,4 +97,201 @@ enum InvoiceStatus {
   SENT
   PAID
   RELEASED
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  BUSY
+  UNAVAILABLE
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model Skill {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  category    String      // e.g., "Frontend", "Backend", "Design", "Marketing"
+  description String?
+  createdAt   DateTime    @default(now())
+  
+  // relations
+  userSkills  UserSkill[]
+  projectSkills ProjectSkill[]
+}
+
+model UserSkill {
+  id       String     @id @default(uuid())
+  userId   String
+  skillId  String
+  level    SkillLevel @default(INTERMEDIATE)
+  verified Boolean    @default(false)
+  
+  // relations
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill    Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, skillId])
+}
+
+model Project {
+  id           String        @id @default(uuid())
+  title        String
+  description  String
+  budget       Float?
+  actualCost   Float?
+  currency     String        @default("USD")
+  status       ProjectStatus @default(PLANNING)
+  difficulty   DifficultyLevel?
+  
+  startDate    DateTime?
+  endDate      DateTime?
+  deadline     DateTime?
+  
+  clientId     String
+  freelancerId String?
+  invoiceId    String?       @unique
+  
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  
+  // relations
+  client       User          @relation("ProjectClient", fields: [clientId], references: [id])
+  freelancer   User?         @relation("ProjectFreelancer", fields: [freelancerId], references: [id])
+  invoice      Invoice?      @relation(fields: [invoiceId], references: [id])
+  skills       ProjectSkill[]
+  reviews      Review[]
+}
+
+model ProjectSkill {
+  id        String @id @default(uuid())
+  projectId String
+  skillId   String
+  required  Boolean @default(true)
+  
+  // relations
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skill     Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  
+  @@unique([projectId, skillId])
+}
+
+model Review {
+  id          String   @id @default(uuid())
+  projectId   String
+  authorId    String   // who wrote the review
+  targetId    String   // who the review is about
+  rating      Int      // 1-5 stars
+  comment     String?
+  
+  // specific ratings
+  quality     Int?     // 1-5
+  communication Int?   // 1-5
+  timeliness  Int?     // 1-5
+  professionalism Int? // 1-5
+  
+  createdAt   DateTime @default(now())
+  
+  // relations
+  project     Project  @relation(fields: [projectId], references: [id])
+  author      User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+  target      User     @relation("ReviewTarget", fields: [targetId], references: [id])
+  
+  @@unique([projectId, authorId, targetId])
+}
+
+model StoredFile {
+  id              String   @id @default(uuid())
+  invoiceId       String?
+  filename        String
+  ipfsHash        String
+  metadataHash    String   @unique
+  encryptedBase64 String?  
+  createdAt       DateTime @default(now())
+
+  // relations
+  invoice Invoice? @relation(fields: [invoiceId], references: [id])
+}
+
+model Dispute {
+  id        String      @id @default(uuid())
+  invoiceId String
+  openerId  String
+  reason    String
+  resolved  Boolean     @default(false)
+  outcome   DisputeOutcome?
+  createdAt DateTime    @default(now())
+
+  // relations
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+  opener  User    @relation(fields: [openerId], references: [id])
+  votes   DisputeVote[]
+}
+
+model DisputeVote {
+  id        String   @id @default(uuid())
+  disputeId String
+  userId    String
+  vote      VoteChoice
+  createdAt DateTime @default(now())
+
+  dispute Dispute @relation(fields: [disputeId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+}
+
+model Reputation {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  
+  // Overall metrics
+  score     Float    @default(0.0)   // overall reputation score (0-100)
+  
+  // Detailed metrics
+  completedProjects    Int @default(0)
+  totalEarnings        Float @default(0.0)
+  averageRating        Float @default(0.0)
+  responseTime         Int?    // average response time in hours
+  onTimeDelivery       Float @default(0.0)  // percentage (0-100)
+  
+  // Review-based scores
+  qualityScore         Float @default(0.0)  // average quality rating
+  communicationScore   Float @default(0.0)  // average communication rating
+  timelinessScore      Float @default(0.0)  // average timeliness rating
+  professionalismScore Float @default(0.0)  // average professionalism rating
+  
+  // Calculated fields
+  totalReviews         Int @default(0)
+  
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum VoteChoice {
+  FOR
+  AGAINST
+}
+
+enum DisputeOutcome {
+  FOR
+  AGAINST
+  TIED
 }

@@ -20,7 +20,9 @@ export class AuthService {
     const user = await this.prisma.user.create({
       data: { email: dto.email, password: hash, name: dto.name },
     });
-    return { id: user.id, email: user.email };
+    const payload = { sub: user.id, email: user.email };
+    const token = this.jwt.sign(payload);
+    return { user: { id: user.id, email: user.email, name: user.name }, token };
   }
 
   async validateUser(email: string, pass: string) {
@@ -31,8 +33,16 @@ export class AuthService {
     return user;
   }
 
-  async login(user: any) {
+  login(user: any) {
     const payload = { sub: user.id, email: user.email };
-    return { access_token: this.jwt.sign(payload) };
+    const token = this.jwt.sign(payload);
+    return { user: { id: user.id, email: user.email, name: user.name }, token };
+  }
+
+  async me(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return null;
+    const { password, ...rest } = user as any;
+    return rest;
   }
 }

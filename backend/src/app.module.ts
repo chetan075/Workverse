@@ -10,6 +10,16 @@ import { ValueLinkModule } from './valuelink/valuelink.module';
 import { PaymentsModule } from './payments/payments.module';
 import { CommonModule } from './common/common.module';
 import { BlockchainModule } from './blockchain/blockchain.module';
+import { AiModule } from './ai/ai.module';
+import { StorageModule } from './storage/storage.module';
+import { DisputesModule } from './disputes/disputes.module';
+import { ReputationModule } from './reputation/reputation.module';
+import { RealtimeModule } from './realtime/realtime.module';
+import { WorkerModule } from './worker/worker.module';
+import { WorkOpportunitiesModule } from './work-opportunities/work-opportunities.module';
+import { TasksModule } from './tasks/tasks.module';
+import { ProjectsModule } from './projects/projects.module';
+import { SkillsModule } from './skills/skills.module';
 
 @Module({
   imports: [
@@ -18,10 +28,20 @@ import { BlockchainModule } from './blockchain/blockchain.module';
     AuthModule,
     UsersModule,
     InvoicesModule,
-      ValueLinkModule,
-      PaymentsModule,
-      BlockchainModule,
-      CommonModule,
+    ValueLinkModule,
+    PaymentsModule,
+    BlockchainModule,
+    AiModule,
+    StorageModule,
+    DisputesModule,
+    ReputationModule,
+    RealtimeModule,
+    WorkerModule,
+    WorkOpportunitiesModule,
+    TasksModule,
+    ProjectsModule,
+    SkillsModule,
+    CommonModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,4 +1,12 @@
-import { Controller, Post, Body, Get, Param, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { ValueLinkService } from './valuelink.service';
 import { IsInt, IsOptional, Min, IsString } from 'class-validator';
 import { Type } from 'class-transformer';

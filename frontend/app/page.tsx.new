@@ -1,0 +1,397 @@
+"use client";
+
+import Link from 'next/link';
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../components/AuthProvider';
+import UserProfileCard from '../components/UserProfileCard';
+import WorkOpportunityCard from '../components/WorkOpportunityCard';
+import TaskCard from '../components/TaskCard';
+import { fetchUserProfiles, fetchWorkOpportunities, fetchAvailableTasks } from '../lib/api';
+
+type UserProfile = {
+  id: string;
+  name?: string;
+  email: string;
+  role: 'CLIENT' | 'FREELANCER';
+  reputation?: { score: number };
+  skills?: string[];
+  hourlyRate?: number;
+  availability?: string;
+  completedProjects?: number;
+};
+
+type WorkOpportunity = {
+  id: string;
+  title: string;
+  description: string;
+  budget: number;
+  currency?: string;
+  skills: string[];
+  deadline?: string;
+  clientName?: string;
+  clientId?: string;
+  postedAt: string;
+  difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
+};
+
+type Task = {
+  id: string;
+  title: string;
+  description: string;
+  budget: number;
+  currency?: string;
+  skills: string[];
+  deadline?: string;
+  freelancerName?: string;
+  freelancerId?: string;
+  estimatedHours?: number;
+  difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
+  category?: string;
+};
+
+export default function Home() {
+  const { user, loading } = useAuth();
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [opportunities, setOpportunities] = useState<WorkOpportunity[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadData() {
+      if (!user || loading) return;
+      
+      setDataLoading(true);
+      try {
+        // Load different data based on user role
+        if (user.role === 'CLIENT') {
+          // For clients, show freelancer profiles and available tasks
+          const [freelancerProfiles, availableTasks] = await Promise.all([
+            fetchUserProfiles('FREELANCER').catch((err) => {
+              console.warn('Failed to load freelancer profiles:', err);
+              return [];
+            }),
+            fetchAvailableTasks().catch((err) => {
+              console.warn('Failed to load available tasks:', err);
+              return [];
+            })
+          ]);
+          setProfiles(freelancerProfiles.slice(0, 6) || []);
+          setTasks(availableTasks.slice(0, 6) || []);
+        } else if (user.role === 'FREELANCER') {
+          // For freelancers, show client profiles and work opportunities
+          const [clientProfiles, workOpportunities] = await Promise.all([
+            fetchUserProfiles('CLIENT').catch((err) => {
+              console.warn('Failed to load client profiles:', err);
+              return [];
+            }),
+            fetchWorkOpportunities().catch((err) => {
+              console.warn('Failed to load work opportunities:', err);
+              return [];
+            })
+          ]);
+          setProfiles(clientProfiles.slice(0, 6) || []);
+          setOpportunities(workOpportunities.slice(0, 6) || []);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        // Fall back to mock data if API calls fail
+        loadMockData();
+      } finally {
+        setDataLoading(false);
+      }
+    }
+
+    function loadMockData() {
+      if (!user) return;
+      
+      const mockProfiles: UserProfile[] = user.role === 'CLIENT' ? [
+        {
+          id: '1', 
+          name: 'Alice Johnson', 
+          email: 'alice@example.com', 
+          role: 'FREELANCER',
+          reputation: { score: 95 },
+          skills: ['React', 'TypeScript', 'Node.js'],
+          hourlyRate: 85,
+          availability: 'Available now'
+        },
+        {
+          id: '2', 
+          name: 'Bob Smith', 
+          email: 'bob@example.com', 
+          role: 'FREELANCER',
+          reputation: { score: 87 },
+          skills: ['Python', 'AI/ML', 'Data Science'],
+          hourlyRate: 95,
+          availability: 'Available next week'
+        }
+      ] : [
+        {
+          id: '3', 
+          name: 'Carol Brown', 
+          email: 'carol@example.com', 
+          role: 'CLIENT',
+          reputation: { score: 92 },
+          completedProjects: 15
+        },
+        {
+          id: '4', 
+          name: 'David Wilson', 
+          email: 'david@example.com', 
+          role: 'CLIENT',
+          reputation: { score: 88 },
+          completedProjects: 8
+        }
+      ];
+      
+      setProfiles(mockProfiles);
+
+      if (user.role === 'FREELANCER') {
+        setOpportunities([
+          {
+            id: '1',
+            title: 'E-commerce Website Development',
+            description: 'Need a modern e-commerce platform with payment integration',
+            budget: 5000,
+            currency: 'USD',
+            skills: ['React', 'Next.js', 'Stripe'],
+            deadline: '2024-02-15',
+            clientName: 'TechCorp Inc.',
+            clientId: '3',
+            postedAt: '2024-01-15',
+            difficulty: 'MEDIUM'
+          },
+          {
+            id: '2',
+            title: 'Mobile App UI/UX Design',
+            description: 'Design user interface for fitness tracking mobile application',
+            budget: 3000,
+            currency: 'USD',
+            skills: ['UI/UX Design', 'Figma', 'Mobile Design'],
+            deadline: '2024-02-01',
+            clientName: 'FitTech Solutions',
+            clientId: '4',
+            postedAt: '2024-01-10',
+            difficulty: 'EASY'
+          }
+        ]);
+      } else if (user.role === 'CLIENT') {
+        setTasks([
+          {
+            id: '1',
+            title: 'Custom Web Application Development',
+            description: 'Professional web applications built with modern technologies',
+            budget: 2500,
+            currency: 'USD',
+            skills: ['JavaScript', 'React', 'Node.js'],
+            estimatedHours: 50,
+            freelancerName: 'Alice Johnson',
+            freelancerId: '1',
+            category: 'Web Development'
+          },
+          {
+            id: '2',
+            title: 'Data Analysis & Visualization',
+            description: 'Transform your data into actionable insights',
+            budget: 1800,
+            currency: 'USD',
+            skills: ['Python', 'R', 'Tableau'],
+            estimatedHours: 30,
+            freelancerName: 'Bob Smith',
+            freelancerId: '2',
+            category: 'Data Science'
+          }
+        ]);
+      }
+    }
+
+    loadData();
+  }, [user, loading]);
+
+  if (loading || dataLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-900">
+        {/* Hero Section */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-slate-800 opacity-50"></div>
+          
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
+            <div className="text-center">
+              <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
+                <span className="text-emerald-400">Work</span>
+                <span className="text-white">verse</span>
+              </h1>
+              <p className="text-xl md:text-2xl text-slate-300 mb-8 max-w-3xl mx-auto">
+                The premium marketplace where top talent meets visionary clients. 
+                Build the future, together.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link 
+                  href="/login" 
+                  className="px-8 py-4 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
+                >
+                  Get Started
+                </Link>
+                <Link 
+                  href="/about" 
+                  className="px-8 py-4 bg-slate-700 border border-slate-600 text-white font-semibold rounded-xl hover:bg-slate-600 transition-all duration-200"
+                >
+                  Learn More
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Features Section */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="panel hover:bg-slate-700/30 transition-all duration-300">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">Lightning Fast</h3>
+              <p className="text-slate-400">Connect with top talent instantly. No waiting, no delays.</p>
+            </div>
+            
+            <div className="panel hover:bg-slate-700/30 transition-all duration-300">
+              <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">Verified Quality</h3>
+              <p className="text-slate-400">Every professional is vetted for exceptional quality.</p>
+            </div>
+            
+            <div className="panel hover:bg-slate-700/30 transition-all duration-300">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">Secure Payments</h3>
+              <p className="text-slate-400">Your transactions are protected with enterprise-grade security.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // User is authenticated - show role-based dashboard
+  return (
+    <div className="min-h-screen bg-slate-900">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-slate-800 opacity-50"></div>
+        
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12">
+          <div className="text-center">
+            <h1 className="text-3xl md:text-5xl font-bold text-white mb-4">
+              Welcome back, {user.name || user.email.split('@')[0]}
+            </h1>
+            <p className="text-lg md:text-xl text-slate-300 mb-8">
+              {user.role === 'CLIENT' 
+                ? 'Discover exceptional talent for your next project' 
+                : 'Find exciting opportunities to showcase your skills'
+              }
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        {user.role === 'CLIENT' ? (
+          // CLIENT VIEW: Show freelancers and available services
+          <div className="space-y-12">
+            {/* Top Freelancers Section */}
+            <section>
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-2xl font-bold text-white">Top Freelancers</h2>
+                <Link 
+                  href="/freelancers" 
+                  className="text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
+                >
+                  View All →
+                </Link>
+              </div>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {profiles.map((profile) => (
+                  <UserProfileCard key={profile.id} profile={profile} />
+                ))}
+              </div>
+            </section>
+
+            {/* Available Services Section */}
+            <section>
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-2xl font-bold text-white">Available Services</h2>
+                <Link 
+                  href="/services" 
+                  className="text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
+                >
+                  View All →
+                </Link>
+              </div>
+              <div className="grid md:grid-cols-2 gap-6">
+                {tasks.map((task) => (
+                  <TaskCard key={task.id} task={task} />
+                ))}
+              </div>
+            </section>
+          </div>
+        ) : (
+          // FREELANCER VIEW: Show clients and work opportunities
+          <div className="space-y-12">
+            {/* Potential Clients Section */}
+            <section>
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-2xl font-bold text-white">Potential Clients</h2>
+                <Link 
+                  href="/clients" 
+                  className="text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
+                >
+                  View All →
+                </Link>
+              </div>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {profiles.map((profile) => (
+                  <UserProfileCard key={profile.id} profile={profile} />
+                ))}
+              </div>
+            </section>
+
+            {/* Work Opportunities Section */}
+            <section>
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-2xl font-bold text-white">Work Opportunities</h2>
+                <Link 
+                  href="/opportunities" 
+                  className="text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
+                >
+                  View All →
+                </Link>
+              </div>
+              <div className="grid md:grid-cols-2 gap-6">
+                {opportunities.map((opportunity) => (
+                  <WorkOpportunityCard key={opportunity.id} opportunity={opportunity} />
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

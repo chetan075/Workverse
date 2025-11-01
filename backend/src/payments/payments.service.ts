@@ -54,12 +54,17 @@ export class PaymentsService {
 
   // test helper: mark invoice PAID without Stripe (simulates successful payment)
   async simulateMarkPaid(invoiceId: string) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id: invoiceId },
+    });
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.status !== 'DRAFT' && invoice.status !== 'SENT') {
       throw new BadRequestException('Invoice not payable in current state');
     }
-    return this.prisma.invoice.update({ where: { id: invoiceId }, data: { status: 'PAID' } });
+    return this.prisma.invoice.update({
+      where: { id: invoiceId },
+      data: { status: 'PAID' },
+    });
   }
 
   async releaseEscrow(invoiceId: string) {
